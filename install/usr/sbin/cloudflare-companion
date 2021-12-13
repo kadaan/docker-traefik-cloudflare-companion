@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from __future__ import print_function
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from get_docker_secret import get_docker_secret
 import atexit
@@ -476,8 +476,18 @@ t = datetime.now().strftime("%s")
 
 logger.debug("Time: %s", t)
 
-for event in client.events(since=t, filters={'Type': 'service', 'Action': u'update', 'status': u'start'}, decode=True):
+last_event_updated=0
+for event in client.events(since=t, filters={'Type': 'service', 'Action': u'update', 'status': u'start',
+                                             'event': u'health_status'}, decode=True):
     new_mappings = {}
+    if str.startswith(event.get(u'Action'), u'health_status: '):
+        if int(datetime.now().timestamp()) - last_event_updated >= 1:
+            timestamp = str(int((datetime.now() - datetime(1970, 1, 1)) / timedelta(seconds=1)))
+            with open("/.last_event", "w") as outfile:
+                outfile.write(timestamp)
+            last_event_updated = int(datetime.now().timestamp())
+        continue
+
     if event.get(u'status') == u'start':
         try:
             if TRAEFIK_VERSION == "1":
